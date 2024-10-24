@@ -1,0 +1,81 @@
+version: '3.3'  # 可以根據需要選擇不同的版本
+
+services:
+  l4a_jpg:
+    image: at_image  # 映像名稱
+    container_name: l4a_jpg  # 容器名稱
+    restart: always  # 自動重啟策略
+    volumes:
+      - /etc/localtime:/etc/localtime:ro  # 掛載 /etc/localtime
+      - /home/ivan/Program/AT_CODE_JPG:/app
+    devices:
+      - /dev/fuse  # 使用 FUSE 設備
+    cap_add:
+      - SYS_ADMIN  # 增加 SYS_ADMIN 權限
+    privileged: true  # 以特權模式運行
+    command: python l4a_jpg.py  # 執行的命令  
+  l6b_fs_jpg:
+    image: at_image  # 映像名稱
+    container_name: l6b_fs_jpg  # 容器名稱
+    restart: always  # 自動重啟策略
+    volumes:
+      - /etc/localtime:/etc/localtime:ro  # 掛載 /etc/localtime
+      - /home/ivan/Program/AT_CODE_JPG:/app
+    devices:
+      - /dev/fuse  # 使用 FUSE 設備
+    cap_add:
+      - SYS_ADMIN  # 增加 SYS_ADMIN 權限
+    privileged: true  # 以特權模式運行
+    command: python l6b_fs_jpg.py  # 執行的命令  
+  l6k_jpg:
+    image: at_image  # 映像名稱
+    container_name: l6k_jpg  # 容器名稱
+    restart: always  # 自動重啟策略
+    volumes:
+      - /etc/localtime:/etc/localtime:ro  # 掛載 /etc/localtime
+      - /home/ivan/Program/AT_CODE_JPG:/app
+    devices:
+      - /dev/fuse  # 使用 FUSE 設備
+    cap_add:
+      - SYS_ADMIN  # 增加 SYS_ADMIN 權限
+    privileged: true  # 以特權模式運行
+    command: python l6k_jpg.py  # 執行的命令      
+  l6b_sw_at2_jpg:
+    image: at_image  # 映像名稱
+    container_name: l6b_sw_at2_jpg  # 容器名稱
+    restart: always  # 自動重啟策略
+    volumes:
+      - /etc/localtime:/etc/localtime:ro  # 掛載 /etc/localtime
+      - /home/ivan/Program/AT_CODE_JPG:/app
+    devices:
+      - /dev/fuse  # 使用 FUSE 設備
+    cap_add:
+      - SYS_ADMIN  # 增加 SYS_ADMIN 權限
+    privileged: true  # 以特權模式運行
+    command: python l6b_sw_at2_jpg.py  # 執行的命令  
+  l6b_sw_tc01_jpg:
+    image: at_image  # 映像名稱
+    container_name: l6b_sw_tc01_jpg  # 容器名稱
+    restart: always  # 自動重啟策略
+    volumes:
+      - /etc/localtime:/etc/localtime:ro  # 掛載 /etc/localtime
+      - /home/ivan/Program/AT_CODE_JPG:/app
+    devices:
+      - /dev/fuse  # 使用 FUSE 設備
+    cap_add:
+      - SYS_ADMIN  # 增加 SYS_ADMIN 權限
+    privileged: true  # 以特權模式運行
+    command: python l6b_sw_tc01_jpg.py  # 執行的命令  
+  l6b_sw_tc02_jpg:
+    image: at_image  # 映像名稱
+    container_name: l6b_sw_tc02_jpg  # 容器名稱
+    restart: always  # 自動重啟策略
+    volumes:
+      - /etc/localtime:/etc/localtime:ro  # 掛載 /etc/localtime
+      - /home/ivan/Program/AT_CODE_JPG:/app
+    devices:
+      - /dev/fuse  # 使用 FUSE 設備
+    cap_add:
+      - SYS_ADMIN  # 增加 SYS_ADMIN 權限
+    privileged: true  # 以特權模式運行
+    command: python l6b_sw_tc02_jpg.py  # 執行的命令  
