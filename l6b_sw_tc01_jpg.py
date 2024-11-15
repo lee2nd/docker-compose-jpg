@@ -11,7 +11,7 @@ import io
 from bson import ObjectId
 import pickle
 import logging
-import gc
+
 
 client = MongoClient('mongodb://ivan:ivan@10.88.26.183:27017')
 db = client["AT_config"]
@@ -38,73 +38,72 @@ class ETL:
         self.fs_jpg = fs_jpg
         
     def etl(self):
-        
-        df = pd.DataFrame.from_records(self.collection.find({'lm_time': {'$gte': (datetime.now()-timedelta(days=150)).strftime("%Y/%m/%d")}}))
+
+        sheet_lst = self.collection.find({'lm_time': {'$gte': (datetime.now()-timedelta(hours=700)).strftime("%Y/%m/%d %H:%M:%S")}}).distinct("sheet_id")
+        df = pd.DataFrame.from_records(self.collection.find({"sheet_id": {'$in': sheet_lst}}))  
 
         if df.empty:
             
+            logging.info("時間內無資料")
             print("時間內無資料")
             
         else:
                     
-            sheet_id_lst = df["sheet_id"].unique()
-
-            for sheet_id in sheet_id_lst:
+            df_all_sheet = df.drop_duplicates(['sheet_id','op_id','lot_id','step','ins_cnt','charge_type'])
+            
+            for _,df_sheet in df_all_sheet.iterrows():
                 
-                logging.info(sheet_id)
-                print(sheet_id)
+                df_chip = df[(df['sheet_id']==df_sheet["sheet_id"]) &
+                                (df['op_id']==df_sheet["op_id"]) &
+                                (df['lot_id']==df_sheet["lot_id"]) &
+                                (df['step']==df_sheet["step"]) &
+                                (df['ins_cnt']==df_sheet["ins_cnt"]) &
+                                (df['charge_type']==df_sheet["charge_type"])]   
+                
+                logging.info(df_sheet["sheet_id"] + " : 共 " + str(len(df_chip)) + " 片")    
 
-                df_sheet = df[df["sheet_id"]==sheet_id]
-                op_lst = df_sheet["op_id"].unique()
+                df_chip = df_chip.sort_values('chip_pos')
+                df_chip = df_chip.reset_index(drop=True)  
 
-                for op_id in op_lst:
-
-                    df_op = df_sheet[df_sheet["op_id"]==op_id]
-                    lot_lst = df_op["lot_id"].unique()
-
-                    for lot_id in lot_lst:
-
-                        df_lot = df_op[df_op["lot_id"]==lot_id]
-                        step_lst = df_lot["step"].unique()        
-
-                        for step in step_lst:
-
-                            df_step = df_lot[df_lot["step"]==step]
-                            ins_cnt_lst = df_step["ins_cnt"].unique()
-
-                            for ins_cnt in ins_cnt_lst:
-
-                                df_ins_cnt = df_step[df_step["ins_cnt"]==ins_cnt]
-                                charge_type_lst = df_ins_cnt["charge_type"].unique()            
-
-                                for charge_type in charge_type_lst:
-
-                                    df_charge_type = df_ins_cnt[df_ins_cnt["charge_type"]==charge_type]
-                                    df_charge_type = df_charge_type.sort_values('chip_pos')
-                                    df_charge_type = df_charge_type.reset_index(drop=True)  
-
-                                    X = df_config[df_config["model"]==sheet_id[:2]]["X"].values[0]
-                                    Y = df_config[df_config["model"]==sheet_id[:2]]["Y"].values[0]
-                                    W = df_config[df_config["model"]==sheet_id[:2]]["W"].values[0]
-                                    H = df_config[df_config["model"]==sheet_id[:2]]["H"].values[0]                                      
-                                    
-                                    # EE/EG
-                                    if (sheet_id[:2] in ["EE","EG"]):
+                X = df_config[df_config["model"]==df_sheet["sheet_id"][:2]]["X"].values[0]
+                Y = df_config[df_config["model"]==df_sheet["sheet_id"][:2]]["Y"].values[0]
+                W = df_config[df_config["model"]==df_sheet["sheet_id"][:2]]["W"].values[0]
+                H = df_config[df_config["model"]==df_sheet["sheet_id"][:2]]["H"].values[0]                                      
                                         
-                                        # 大板長寬
-                                        left, right, bottom, top, wspace, hspace = 0.1, 0.91, 0.07, 0.95, 0, 0
-                                        figsize_rgb = (14, 10)
-                                        figsize_w = (12, 3)                     
-                                    
-                                    else:
-                                        continue
-                                        
-                                    self.plot_sheet(df_charge_type, X, Y, H, W,
-                                                    sheet_id, op_id, lot_id, step, ins_cnt, charge_type,
-                                                    left, right, bottom, top, wspace, hspace,
-                                                    figsize_rgb, figsize_w
-                                                    )
+                # EK/EJ
+                if (df_sheet["sheet_id"][:2] in ["EJ","EK"]):
+                    
+                    # 大板長寬
+                    left, right, bottom, top, wspace, hspace = 0.1, 0.88, 0.12, 0.95, 0, 0
+                    figsize_rgb = (4, 4.3)
+                    figsize_w = (4, 1.4)
+                
+                # EE/EG
+                elif (df_sheet["sheet_id"][:2] in ["EE","EG"]):
+                    
+                    # 大板長寬
+                    left, right, bottom, top, wspace, hspace = 0.1, 0.91, 0.07, 0.95, 0, 0
+                    figsize_rgb = (14, 10)
+                    figsize_w = (12, 3)
 
+                # EM/EL
+                elif (df_sheet["sheet_id"][:2] in ["EM","EL"]):
+                    
+                    # 大板長寬
+                    left, right, bottom, top, wspace, hspace = 0.1, 0.9, 0.08, 0.95, 0, 0
+                    figsize_rgb = (6, 5)  
+                    figsize_w = (4, 10)                           
+                
+                else:
+                    continue
+
+                self.plot_sheet(df_chip, X, Y, H, W,
+                                df_sheet["sheet_id"], df_sheet["op_id"], df_sheet["lot_id"], df_sheet["step"], df_sheet["ins_cnt"], df_sheet["charge_type"],
+                                left, right, bottom, top, wspace, hspace,
+                                figsize_rgb, figsize_w
+                                )
+                        
+                        
     def plot_sheet(self, df, X, Y, H, W,
                     sheet_id, op_id, lot_id, step, ins_cnt, charge_type,
                     left, right, bottom, top, wspace, hspace,
@@ -264,19 +263,26 @@ class ETL:
                         'sheet_id': sheet_id,
                         'ins_cnt': ins_cnt,
                         'step': step,
-                        'charge_type': charge_type,
-                        '2d_r_object_id': sheet_2d_object_id_lst[0],
-                        '2d_g_object_id': sheet_2d_object_id_lst[1],
-                        '2d_b_object_id': sheet_2d_object_id_lst[2],
-                        '2d_w_object_id': sheet_2d_object_id_lst[3]
+                        'charge_type': charge_type
                         }
-        try:
-            self.collection_jpg.insert_one(table_schema)
-            del table_schema
-            gc.collect()
-        except:
-            # db 內本來就有資料
-            pass   
+
+        if not pd.DataFrame.from_records(self.collection_jpg.find(table_schema)).empty:
+            
+            for col in ["2d_b_object_id", "2d_g_object_id", "2d_r_object_id", "2d_w_object_id"]:
+
+                object_id = pd.DataFrame.from_records(self.collection_jpg.find(table_schema))[col][0]
+                self.fs_jpg.delete(object_id)
+            
+        self.collection_jpg.update_one(
+            table_schema, 
+            {"$set": {"2d_r_object_id": sheet_2d_object_id_lst[0],
+                        "2d_g_object_id": sheet_2d_object_id_lst[1],
+                        "2d_b_object_id": sheet_2d_object_id_lst[2],
+                        "2d_w_object_id": sheet_2d_object_id_lst[3]
+                        }},
+            upsert=True)
+
+        del table_schema   
 
 def job():
 
@@ -287,18 +293,7 @@ def job():
     # 選擇 Database
     db = client["AT_jpg"]
     # 選擇 collection
-    collection_jpg = db["L6B_SW_TC01_JPG"]
-    # 創建 index 避免資料重複塞進資料庫
-    collection_jpg.create_index([("lm_time", 1),
-                                ("eqp_id", 1),
-                                ("op_id", 1),
-                                ("recipe_id", 1),
-                                ("lot_id", 1),
-                                ("sheet_id", 1),
-                                ("ins_cnt", 1),
-                                ("step", 1),
-                                ("charge_type", 1)], 
-                            unique=True)  
+    collection_jpg = db["L6B_SW_TC01_JPG"] 
     # 選擇 gridfs
     fs_jpg = gridfs.GridFS(db, collection="L6B_SW_TC01_JPG")    
         
@@ -319,7 +314,6 @@ if __name__ == '__main__':
 
     # 啟動 Job
     job()
-    # schedule.every(12).hours.do(job)
 
     while True:  
         schedule.run_pending()    
