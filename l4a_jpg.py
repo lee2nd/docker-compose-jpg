@@ -11,7 +11,7 @@ import io
 from bson import ObjectId
 import pickle
 import logging
-import gc
+
 
 def connect_MongoDB(client, db_name, collection):
     
@@ -33,7 +33,7 @@ class ETL:
         
     def etl(self):
         
-        df = pd.DataFrame.from_records(self.collection.find({'lm_time': {'$gte': (datetime.now()-timedelta(days=150)).strftime("%Y/%m/%d")}}))
+        df = pd.DataFrame.from_records(self.collection.find({'lm_time': {'$gte': (datetime.now()-timedelta(days=700)).strftime("%Y/%m/%d")}}))
 
         if df.empty:
             
@@ -69,7 +69,7 @@ class ETL:
                             for charge_type in charge_type_lst:
 
                                 df_charge_type = df_ins_cnt[df_ins_cnt["charge_type"]==charge_type]
-                                df_charge_type = df_charge_type.reset_index(drop=True)                                      
+                                df_charge_type = df_charge_type.reset_index(drop=True)  
 
                                 left, right, bottom, top, wspace, hspace = 0.1, 0.91, 0.07, 0.95, 0, 0
                                 figsize_rgb = (14, 10)
@@ -91,7 +91,10 @@ class ETL:
                                     H = 156         
                                 elif product == "Z123":
                                     W = 4800
-                                    H = 600                                                
+                                    H = 600    
+                                elif product in "L161":
+                                    W = 720
+                                    H = 540                                                                                  
 
                                 self.plot_sheet(df_charge_type, W, H,
                                                 chip_id, op_id, step, ins_cnt, charge_type,
@@ -229,7 +232,6 @@ if __name__ == '__main__':
 
     # 啟動 Job
     job()
-    # schedule.every(12).hours.do(job)
 
     while True:  
         schedule.run_pending()    
