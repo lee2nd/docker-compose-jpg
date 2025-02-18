@@ -19,6 +19,7 @@ collection = db["config"]
 cursor = collection.find()
 df_config = pd.DataFrame.from_records(cursor).drop(columns=["_id"])
 
+
 def connect_MongoDB(client, db_name, collection):
     
     client = MongoClient(client)
@@ -27,6 +28,7 @@ def connect_MongoDB(client, db_name, collection):
     user_fs = gridfs.GridFS(user_db, collection=collection)
     
     return user_collection, user_fs
+
 
 class ETL:
     
@@ -39,7 +41,9 @@ class ETL:
                 
     def etl(self):
 
-        sheet_lst = self.collection.find({'sheet_start_time': {'$gte': (datetime.now()-timedelta(hours=700)).strftime("%Y/%m/%d %H:%M:%S")}}).distinct("sheet_id")
+        # sheet_lst = self.collection.find({'sheet_start_time': {'$gte': (datetime.now()-timedelta(days=300)).strftime("%Y/%m/%d %H:%M:%S")}}).distinct("sheet_id")
+        sheet_lst = self.collection.find({}).distinct("sheet_id")
+        # sheet_lst = [s for s in sheet_lst if s[0] == "G"]
         df = pd.DataFrame.from_records(self.collection.find({"sheet_id": {'$in': sheet_lst}}))  
 
         if df.empty:
@@ -48,19 +52,30 @@ class ETL:
             print("時間內無資料")
             
         else:
-                    
-            df_all_sheet = df.drop_duplicates(['sheet_id','op_id','sheet_start_time','step','charge_type'])
+            
+            df = df.drop_duplicates(['sheet_start_time','eqp_id','op_id','recipe_id','lot_id','sheet_id','chip_id','step','charge_type'])
+            df_all_sheet = df.drop_duplicates(['eqp_id','op_id','recipe_id','lot_id','sheet_id','step','charge_type'])
+            df_all_sheet = df_all_sheet.sort_values(by='sheet_start_time', ascending=False)
             
             for _,df_sheet in df_all_sheet.iterrows():
                 
-                df_chip = df[(df['sheet_id']==df_sheet["sheet_id"]) &
-                                (df['op_id']==df_sheet["op_id"]) &
-                                (df['sheet_start_time']==df_sheet["sheet_start_time"]) &
-                                (df['step']==df_sheet["step"]) &
-                                (df['charge_type']==df_sheet["charge_type"])]   
+                df_chip = df[(df['eqp_id']==df_sheet["eqp_id"]) &
+                            (df['op_id']==df_sheet["op_id"]) &
+                            (df['recipe_id']==df_sheet["recipe_id"]) &
+                            (df['lot_id']==df_sheet["lot_id"]) &
+                            (df['sheet_id']==df_sheet["sheet_id"]) &
+                            (df['step']==df_sheet["step"]) &
+                            (df['charge_type']==df_sheet["charge_type"])]   
                 
-                logging.info(df_sheet["sheet_id"] + " : 共 " + str(len(df_chip)) + " 片")    
-
+                logging.info(df_sheet['sheet_start_time'] + "," +\
+                            df_sheet['eqp_id'] + "," +\
+                            df_sheet['op_id'] + "," +\
+                            df_sheet['recipe_id'] + "," +\
+                            df_sheet['lot_id'] + "," +\
+                            df_sheet['sheet_id'] + "," +\
+                            df_sheet['step'] + "," +\
+                            df_sheet['charge_type'] + "," + " : 共 " + str(len(df_chip)) + " 片")
+                
                 df_chip = df_chip.sort_values('chip_pos')
                 df_chip = df_chip.reset_index(drop=True)  
 
@@ -91,29 +106,68 @@ class ETL:
                     # 大板長寬
                     left, right, bottom, top, wspace, hspace = 0.1, 0.9, 0.08, 0.95, 0, 0
                     figsize_rgb = (6, 5)  
-                    figsize_w = (4, 10)                           
-                
+                    figsize_w = (4, 10)     
+
+                # GA/GB
+                elif (df_sheet["sheet_id"][:2] in ["GA","GB"]):
+                    
+                    # 大板長寬
+                    left, right, bottom, top, wspace, hspace = 0.1, 0.9, 0.08, 0.95, 0, 0
+                    figsize_rgb = (10, 6.5)  
+                    figsize_w = (24, 5.5)    
+
                 else:
                     continue
 
                 self.plot_sheet(df_chip, X, Y, H, W,
-                                df_sheet["sheet_id"], df_sheet["op_id"], df_sheet["sheet_start_time"], df_sheet["step"], df_sheet["charge_type"],
+                                df_sheet["sheet_start_time"],
+                                df_sheet["eqp_id"],
+                                df_sheet["op_id"],
+                                df_sheet["recipe_id"],
+                                df_sheet["lot_id"],
+                                df_sheet["sheet_id"],
+                                df_sheet["ins_cnt"], 
+                                df_sheet["step"],
+                                df_sheet["charge_type"],
                                 left, right, bottom, top, wspace, hspace,
-                                figsize_rgb, figsize_w
+                                figsize_rgb, figsize_w,
+                                len(df_chip)
                                 )
-                        
+
 
     def plot_sheet(self, df, X, Y, H, W,
-                    sheet_id, op_id, sheet_time, step, charge_type,
+                    sheet_start_time, 
+                    eqp_id,
+                    op_id, 
+                    recipe_id,
+                    lot_id, 
+                    sheet_id,  
+                    ins_cnt,
+                    step, 
+                    charge_type,
                     left, right, bottom, top, wspace, hspace,
-                    figsize_rgb, figsize_w):
+                    figsize_rgb, figsize_w,
+                    chip_cnt):
         
         # config
         sheet_2d_object_id_lst = []
         color_dict = {"Reds":"2d_r_object_id",
                     "Greens":"2d_g_object_id",
                     "Blues":"2d_b_object_id"}
-        
+
+        # EK/EJ
+        if (sheet_id[:2] in ["EJ","EK"]):
+            matrix = [(i, j) for i in range(2) for j in range(2)]
+        # EE/EG
+        elif (sheet_id[:2] in ["EE","EG"]):
+            matrix = [(i, j) for i in range(8) for j in range(6)]
+        # EM/EL
+        elif (sheet_id[:2] in ["EM","EL"]):
+            matrix = [(i, j) for i in range(8) for j in range(4)]
+        # EM/EL
+        elif (sheet_id[:2] in ["GA","GB"]):
+            matrix = [(i, j) for i in range(12) for j in range(2)] 
+                    
         for color in ["Reds","Greens","Blues"]:
             
             plt.close('all')
@@ -131,10 +185,21 @@ class ETL:
                 
                 x = Y - 1 - (ord(df['chip_pos'][i][-1]) - ord('A'))
                 y = ord(df['chip_pos'][i][-2]) - ord('A')                
-                
+
+                if (sheet_id[:2] in ["GA","GB"]):
+                    if x <= 3: x+=1
+
                 plt.axis('on')
                 axs[x, y].imshow(arr, cmap=color)
                 axs[x, y].set_aspect('equal')
+
+                try:
+                    matrix.remove((x,y))
+                except:
+                    pass 
+
+            for xy in matrix:
+                axs[xy[0], xy[1]].text(0.5, 0.5, 'X', fontsize=20, color='red', ha='center', va='center')
 
             # 清理所有子圖的 x 和 y ticks
             for ax in axs.flat:
@@ -171,6 +236,16 @@ class ETL:
                 for i, letter in enumerate(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']):
                     fig.text(0.92, (i+1.1)/9.1, letter, va='center', fontsize=14, weight='bold')
 
+            elif (X,Y) == (2,12):
+
+                # 在底部加入 AB
+                for i, letter in enumerate(['A', 'B']):
+                    fig.text((i+0.75)/2.5, 0.05, letter, ha='center', fontsize=14, weight='bold')
+
+                # 在右側加入 ABCDEFGHJKLM
+                for i, letter in enumerate(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M']):
+                    fig.text(0.92, (i+1.65)/14, letter, va='center', fontsize=14, weight='bold')  
+
             plt.savefig('l6k_temp.jpg')
             image = Image.open("l6k_temp.jpg")
             image_bytes = io.BytesIO()
@@ -206,10 +281,16 @@ class ETL:
 
             x = Y - 1 - (ord(df['chip_pos'][i][-1]) - ord('A'))
             y = ord(df['chip_pos'][i][-2]) - ord('A')                       
-            
+
+            if (sheet_id[:2] in ["GA","GB"]):
+                if x <= 3: x+=1            
+
             plt.axis('on')
             axs[x, y].imshow(charge_2d_ori, cmap="Greys")
             axs[x, y].set_aspect('equal')
+
+        for xy in matrix:
+            axs[xy[0], xy[1]].text(0.5, 0.5, 'X', fontsize=20, color='red', ha='center', va='center')
 
         # 清理所有子圖的 x 和 y ticks
         for ax in axs.flat:
@@ -246,6 +327,16 @@ class ETL:
             for i, letter in enumerate(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']):
                 fig.text(0.92, (i+1.1)/9.1, letter, va='center', fontsize=14, weight='bold')                     
 
+        elif (X,Y) == (2,12):
+
+            # 在底部加入 AB
+            for i, letter in enumerate(['A', 'B']):
+                fig.text((i+0.75)/2.5, 0.05, letter, ha='center', fontsize=14, weight='bold')
+
+            # 在右側加入 ABCDEFGHJKLM
+            for i, letter in enumerate(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M']):
+                fig.text(0.92, (i+1.65)/14, letter, va='center', fontsize=14, weight='bold')  
+
         plt.savefig('l6k_temp.jpg')
         image = Image.open("l6k_temp.jpg")
         image_bytes = io.BytesIO()
@@ -254,15 +345,16 @@ class ETL:
 
         sheet_2d_object_id_lst.append(self.fs_jpg.put(image_bytes, filename="l6k_temp.jpg"))
 
-        table_schema = {'lot_start_time': df["lot_start_time"].unique()[0],
-                        'sheet_start_time': sheet_time,
-                        'eqp_id': df["eqp_id"].unique()[0],
+        table_schema = {'sheet_start_time': sheet_start_time,
+                        'eqp_id': eqp_id,
                         'op_id': op_id,
-                        'recipe_id': df["recipe_id"].unique()[0],
-                        'lot_id': df["lot_id"].unique()[0],
+                        'recipe_id': recipe_id,
+                        'lot_id': lot_id,
                         'sheet_id': sheet_id,
+                        'ins_cnt': ins_cnt,
                         'step': step,
-                        'charge_type': charge_type
+                        'charge_type': charge_type,
+                        'chip_cnt': chip_cnt
                         }
 
         if not pd.DataFrame.from_records(self.collection_jpg.find(table_schema)).empty:
